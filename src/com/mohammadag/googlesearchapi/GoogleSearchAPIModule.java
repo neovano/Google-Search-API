@@ -42,6 +42,7 @@ public class GoogleSearchAPIModule implements IXposedHookLoadPackage, IXposedHoo
 		if (!lpparam.packageName.equals(Constants.GOOGLE_SEARCH_PACKAGE))
 			return;
 		debug("Processing " + Constants.GOOGLE_SEARCH_PACKAGE);
+		//hookV33(lpparam);
 		hookV34(lpparam);
 
 	}
@@ -211,6 +212,132 @@ public class GoogleSearchAPIModule implements IXposedHookLoadPackage, IXposedHoo
 			}
 		});		
 	}
+
+//	private void hookV33(LoadPackageParam lpparam) throws Throwable {
+//		
+//		/* IPC, not sure how many processes Google Search runs in, but we need this since
+//		 * it's surely not one.
+//		 */
+//		final BroadcastReceiver internalReceiver = new BroadcastReceiver() {
+//			@Override
+//			public void onReceive(Context context, Intent intent) {
+//				if (Constants.INTENT_SETTINGS_UPDATED.equals(intent.getAction())) {
+//					mPreferences.reload();
+//				} else if (Constants.INTENT_QUEUE_INTENT.equals(intent.getAction())) {
+//					Intent intentToQueue = intent.getParcelableExtra(Constants.KEY_INTENT_TO_QUEUE);
+//					mQueuedIntentList.add(intentToQueue);
+//				} else if (Constants.INTENT_FLUSH_INTENTS.equals(intent.getAction())) {
+//					for (Intent intentToFlush : mQueuedIntentList) {
+//						XposedBridge.log("Sending queued intent");
+//						sendBroadcast(mContext, intentToFlush);
+//						mQueuedIntentList.remove(intentToFlush);
+//					}
+//				}
+//			}
+//		};
+//
+//		Class<?> Query = findClass("com.google.android.search.shared.api.Query", lpparam.classLoader);
+//		Class<?> MyVoiceSearchControllerListener =
+//				findClass("com.google.android.search.core.SearchController$MyVoiceSearchControllerListener", lpparam.classLoader);
+//		Class<?> SearchController = findClass("com.google.android.search.core.SearchController", lpparam.classLoader);
+//		Class<?> SearchResultFetcher = findClass("com.google.android.search.core.prefetch.SearchResultFetcher", lpparam.classLoader);
+//
+//		XposedBridge.hookAllConstructors(SearchController, new XC_MethodHook() {
+//			@Override
+//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+//				final Object thisObject = param.thisObject;
+//				mContext = (Context) getObjectField(param.thisObject, "mContext");
+//				mQueuedIntentList = new ArrayList<Intent>();
+//				mContext.registerReceiver(new BroadcastReceiver() {
+//					@Override
+//					public void onReceive(Context context, Intent intent) {
+//						String string = intent.getStringExtra(GoogleSearchApi.KEY_TEXT_TO_SPEAK);
+//						if (TextUtils.isEmpty(string))
+//							return;
+//
+//						Object mVoiceSearchServices = getObjectField(thisObject, "mVoiceSearchServices");
+//						Object ttsManager = XposedHelpers.callMethod(mVoiceSearchServices, "getLocalTtsManager"); 
+//						Method method = XposedHelpers.findMethodBestMatch(ttsManager.getClass(), "enqueue", String.class, Runnable.class);
+//						try {
+//							method.invoke(ttsManager, string, null);
+//						} catch (Exception e) {
+//							e.printStackTrace();
+//						}
+//					}
+//				}, new IntentFilter(GoogleSearchApi.INTENT_REQUEST_SPEAK));
+//
+//				IntentFilter iF = new IntentFilter();
+//				iF.addAction(Constants.INTENT_SETTINGS_UPDATED);
+//				iF.addAction(Constants.INTENT_FLUSH_INTENTS);
+//				iF.addAction(Constants.INTENT_QUEUE_INTENT);
+//
+//				mContext.registerReceiver(internalReceiver, iF);
+//			}
+//		});
+//
+//		findAndHookMethod(SearchResultFetcher, "obtainSearchResult", Query, new XC_MethodHook() {
+//			@Override
+//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+//				Object queryResult = param.args[0];
+//				CharSequence searchQueryText =
+//						(CharSequence) getObjectField(queryResult, "mQueryChars");
+//				Object mCache = getObjectField(param.thisObject, "mCache");
+//				Object mClock = getObjectField(param.thisObject, "mClock");
+//				Object mCachedResult = XposedHelpers.callMethod(mCache, "get", queryResult,
+//						XposedHelpers.callMethod(mClock, "elapsedRealtime"),
+//						true);
+//				
+//				mPreferences.reload();
+//
+//				/* Not doing this causes a usability issue. If the user has a search showing
+//				 * results, and they tap the mic, then cancel the voice search, then the search
+//				 * is handled again, thus throwing the user in an infinite loop of pressing back,
+//				 * until the user figures it out and uses the task switcher to close Google Search.
+//				 */
+//				if (mCachedResult != null && mContext != null
+//						&& mPreferences.getBoolean(Constants.KEY_PREVENT_DUPLICATES, true)) {
+//					return;
+//				}
+//
+//				if (mContext != null) {
+//					broadcastGoogleSearch(mContext, searchQueryText, false,
+//							mPreferences.getBoolean(Constants.KEY_DELAY_BROADCASTS, false));
+//				} else {
+//					XposedBridge.log(String.format("Google Search API: New Search detected: %s",
+//							searchQueryText.toString()));
+//				}
+//			}
+//		});
+//
+//		XposedBridge.hookAllMethods(MyVoiceSearchControllerListener, "onRecognitionResult", new XC_MethodHook() {
+//			@Override
+//			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+//				CharSequence voiceResult = (CharSequence) param.args[0];
+//				mPreferences.reload();
+//				if (mContext != null) {
+//					broadcastGoogleSearch(mContext, voiceResult, true,
+//							mPreferences.getBoolean(Constants.KEY_DELAY_BROADCASTS, false));
+//				} else {
+//					XposedBridge.log(voiceResult.toString());
+//				}
+//			}
+//		});
+//
+//		/* GEL workaround, GEL opens Google Search eventually, so this will overlay whatever
+//		 * activity a developer has made. This broadcasts intents after the window has gained focus.
+//		 */
+//		findAndHookMethod("com.google.android.search.gel.SearchOverlayImpl", lpparam.classLoader,
+//				"onWindowFocusChanged", boolean.class, new XC_MethodHook() {
+//			@Override
+//			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+//				boolean hasFocus = (Boolean) param.args[0];
+//
+//				Context context = (Context) getObjectField(param.thisObject, "mContext");
+//				if (context != null && !hasFocus)
+//					context.sendBroadcast(new Intent(Constants.INTENT_FLUSH_INTENTS));
+//			}
+//		});
+//	}
 
 	private void debug(String msg) {
 		Log.d("GoogleSearchAPI", msg);
